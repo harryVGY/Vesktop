@@ -144,6 +144,19 @@
     margin-bottom: 0;
 }
 
+.vcd-screen-picker-audio-windows {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.vcd-screen-picker-audio-hint {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: 0.5em;
+    margin-bottom: 0.25em;
+}
+
 .vcd-screen-picker-audio-sources {
     display: flex;
     gap: 1em;

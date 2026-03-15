@@ -50,6 +50,11 @@ export type StreamFps = (typeof StreamFps)[number];
 
 type SpecialSource = "None" | "Entire System";
 
+const specialSourceLabels: Record<SpecialSource, string> = {
+    None: "No Audio",
+    "Entire System": "Entire System (All Applications)"
+};
+
 type AudioSource = SpecialSource | Node;
 type AudioSources = SpecialSource | Node[];
 
@@ -60,6 +65,8 @@ interface AudioItem {
 
 interface StreamSettings {
     audio: boolean;
+    /** Windows-only: use loopbackWithMute to prevent local audio feedback when streaming on speakers */
+    windowsAudioMute?: boolean;
     contentHint?: string;
     includeSources?: AudioSources;
     excludeSources?: AudioSources;
@@ -424,13 +431,33 @@ function StreamSettingsUi({
                             </Paragraph>
                         </div>
                         {isWindows && (
-                            <FormSwitch
-                                title="Stream With Audio"
-                                hideBorder
-                                value={settings.audio}
-                                onChange={checked => setSettings(s => ({ ...s, audio: checked }))}
-                                className={cl("audio")}
-                            />
+                            <div className={cl("audio-windows")}>
+                                <FormSwitch
+                                    title="Stream With Audio"
+                                    note="Captures all system audio and shares it with viewers."
+                                    hideBorder
+                                    value={settings.audio}
+                                    onChange={checked => setSettings(s => ({ ...s, audio: checked }))}
+                                    className={cl("audio")}
+                                />
+                                {settings.audio && (
+                                    <>
+                                        <FormSwitch
+                                            title="Mute Local Speakers While Streaming"
+                                            note="Prevents audio feedback and echo when using speakers. Your viewers still hear the audio."
+                                            hideBorder
+                                            value={settings.windowsAudioMute ?? false}
+                                            onChange={checked =>
+                                                setSettings(s => ({ ...s, windowsAudioMute: checked }))
+                                            }
+                                        />
+                                        <Paragraph className={cl("audio-hint")}>
+                                            Tip: to limit captured audio to one app, mute other applications in the
+                                            Windows Volume Mixer before streaming.
+                                        </Paragraph>
+                                    </>
+                                )}
+                            </div>
                         )}
                     </section>
                 </div>
@@ -461,7 +488,7 @@ function hasMatchingProps(value: Node, other: Node) {
 
 function mapToAudioItem(node: AudioSource, granularSelect?: boolean, deviceSelect?: boolean): AudioItem[] {
     if (isSpecialSource(node)) {
-        return [{ name: node, value: node }];
+        return [{ name: specialSourceLabels[node] ?? node, value: node }];
     }
 
     const rtn: AudioItem[] = [];
@@ -641,8 +668,34 @@ function AudioSourcePickerLinux({
               .filter(uniqueName)
         : [];
 
+    const audioHint = (() => {
+        if (!includeSources || includeSources === "None") {
+            return (
+                <Paragraph className={cl("audio-hint")}>
+                    No audio will be included. Pick a specific application below to share only its audio, or choose{" "}
+                    <b>Entire System (All Applications)</b> to share all system audio.
+                </Paragraph>
+            );
+        }
+        if (includeSources === "Entire System") {
+            return (
+                <Paragraph className={cl("audio-hint")}>
+                    <b>All system audio</b> will be shared. Use <b>Exclude Sources</b> on the right to remove specific
+                    applications.
+                </Paragraph>
+            );
+        }
+        const apps = [...new Set((includeSources as Node[]).map(n => n["application.name"] || n["node.name"] || "Unknown"))];
+        return (
+            <Paragraph className={cl("audio-hint")}>
+                Only audio from <b>{apps.join(", ")}</b> will be shared — other applications will not be heard.
+            </Paragraph>
+        );
+    })();
+
     return (
         <>
+            {audioHint}
             <div className={cl("audio-sources")}>
                 <section>
                     <Heading tag="h5">{loading ? "Loading Sources..." : "Audio Sources"}</Heading>
@@ -651,7 +704,7 @@ function AudioSourcePickerLinux({
                             options={allSources.map(({ name, value }) => ({
                                 label: name,
                                 value: value,
-                                default: name === "None"
+                                default: name === specialSourceLabels["None"]
                             }))}
                             isSelected={isItemSelected(includeSources)}
                             select={updateItems(setIncludeSources, includeSources)}
@@ -667,11 +720,11 @@ function AudioSourcePickerLinux({
                         <SimpleErrorBoundary>
                             <Select
                                 options={allSources
-                                    .filter(x => x.name !== "Entire System")
+                                    .filter(x => x.name !== specialSourceLabels["Entire System"])
                                     .map(({ name, value }) => ({
                                         label: name,
                                         value: value,
-                                        default: name === "None"
+                                        default: name === specialSourceLabels["None"]
                                     }))}
                                 isSelected={isItemSelected(excludeSources)}
                                 select={updateItems(setExcludeSources, excludeSources)}
