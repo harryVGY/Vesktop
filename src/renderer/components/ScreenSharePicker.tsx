@@ -65,6 +65,8 @@ interface AudioItem {
 
 interface StreamSettings {
     audio: boolean;
+    /** Windows-only: use loopbackWithMute to prevent local audio feedback when streaming on speakers */
+    windowsAudioMute?: boolean;
     contentHint?: string;
     includeSources?: AudioSources;
     excludeSources?: AudioSources;
@@ -429,14 +431,33 @@ function StreamSettingsUi({
                             </Paragraph>
                         </div>
                         {isWindows && (
-                            <FormSwitch
-                                title="Stream With Audio"
-                                note="Windows captures all system audio — per-application audio isolation is not available on this platform."
-                                hideBorder
-                                value={settings.audio}
-                                onChange={checked => setSettings(s => ({ ...s, audio: checked }))}
-                                className={cl("audio")}
-                            />
+                            <div className={cl("audio-windows")}>
+                                <FormSwitch
+                                    title="Stream With Audio"
+                                    note="Captures all system audio and shares it with viewers."
+                                    hideBorder
+                                    value={settings.audio}
+                                    onChange={checked => setSettings(s => ({ ...s, audio: checked }))}
+                                    className={cl("audio")}
+                                />
+                                {settings.audio && (
+                                    <>
+                                        <FormSwitch
+                                            title="Mute Local Speakers While Streaming"
+                                            note="Prevents audio feedback and echo when using speakers. Your viewers still hear the audio."
+                                            hideBorder
+                                            value={settings.windowsAudioMute ?? false}
+                                            onChange={checked =>
+                                                setSettings(s => ({ ...s, windowsAudioMute: checked }))
+                                            }
+                                        />
+                                        <Paragraph className={cl("audio-hint")}>
+                                            Tip: to limit captured audio to one app, mute other applications in the
+                                            Windows Volume Mixer before streaming.
+                                        </Paragraph>
+                                    </>
+                                )}
+                            </div>
                         )}
                     </section>
                 </div>
